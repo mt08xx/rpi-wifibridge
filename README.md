@@ -2,10 +2,11 @@
 
 
 ## build
-docker build . mt08/rpi-wifibridge
+`docker build . -t mt08/rpi-wifibridge`
 
 
 ## run
+```
 docker run -it --net host --privileged --rm --name rpi-wifibridge \
   -e INTERFACE=wlan0 \
   -e INTERFACE2=eth0 \
@@ -14,3 +15,4 @@ docker run -it --net host --privileged --rm --name rpi-wifibridge \
   -e SSID=<SSID> \
   -e WPA_PASSPHRASE=<password>
   mt08/rpi-wifibridge
+```
