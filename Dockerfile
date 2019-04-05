@@ -1,4 +1,4 @@
-FROM resin/rpi-raspbian:stretch
+FROM balenalib/rpi-raspbian:stretch
 
 LABEL maintainer="mt08xx@users.noreply.github.com"
 

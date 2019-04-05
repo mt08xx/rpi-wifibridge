@@ -1,6 +1,5 @@
 #!/bin/bash
 
-
 # Check if running in privileged mode
 if [ ! -w "/sys" ] ; then
     echo "[Error] Not running in privileged mode."
@@ -8,30 +7,25 @@ if [ ! -w "/sys" ] ; then
 fi
 
 # Check environment variables
-if [ ! "${INTERFACE}" ] ; then
-    echo "[Error] An interface must be specified."
-    exit 1
-fi
-if [ ! "${INTERFACE2}" ] ; then
-    echo "[Error] An interface must be specified."
-    exit 1
-fi
 if [ ! "${DHCP_SERVER}" ] ; then
     echo "[Error] An interface must be specified."
     exit 1
 fi
 
-
 # Default values
-true ${AP_ADDR:=192.168.254.1}
+true ${IP_ADDR_ETH:=$(/sbin/ip -4 -br addr show eth0| /bin/grep -Po "\\d+\\.\\d+\\.\\d+\\.\\d+")}
 true ${SSID:=raspberry}
 true ${CHANNEL:=11}
 true ${WPA_PASSPHRASE:=passw0rd}
 true ${HW_MODE:=g}
 
+true ${INTERFACE_WLAN:=wlan0}
+true ${INTERFACE_ETH:=eth0}
+
+
 if [ ! -f "/etc/hostapd.conf" ] ; then
     cat > "/etc/hostapd.conf" <<EOF
-interface=${INTERFACE}
+interface=${INTERFACE_WLAN}
 ${DRIVER+"driver=${DRIVER}"}
 ssid=${SSID}
 hw_mode=${HW_MODE}
@@ -59,26 +53,22 @@ EOF
 
 fi
 
-# Setup interface and restart DHCP service
-ip link set ${INTERFACE} up
-ip addr flush dev ${INTERFACE}
-ip addr add ${AP_ADDR}/32 dev ${INTERFACE}
-
-/usr/sbin/parprouted ${INTERFACE} ${INTERFACE2}
-/usr/sbin/dhcp-helper -s ${DHCP_SERVER} -b ${INTERFACE2}
-
-# NAT settings
-echo "NAT settings  ip_forward"
-for i in ip_forward ; do
-  if [ $(cat /proc/sys/net/ipv4/$i) -eq 1 ] ; then
-    echo $i already 1
-  else
-    echo "1" > /proc/sys/net/ipv4/$i
-  fi
-done
+# 
+echo "set ip_forward to 1"
+echo "1" > /proc/sys/net/ipv4/ip_forward
 cat /proc/sys/net/ipv4/ip_forward
 
+# Setup interface and restart DHCP service
+ip addr flush dev ${INTERFACE_WLAN}
+ip addr add ${IP_ADDR_ETH}/32 dev ${INTERFACE_WLAN}
+ip link set ${INTERFACE_WLAN} up
 
+sudo /sbin/ip link set ${INTERFACE_WLAN} promisc on
+sudo /sbin/ip link set ${INTERFACE_ETH} promisc on
+
+/usr/sbin/parprouted ${INTERFACE_ETH} ${INTERFACE_WLAN} &
+/usr/sbin/bcrelay -d -i ${INTERFACE_ETH} -o  ${INTERFACE_WLAN}
+/usr/sbin/dhcp-helper -s ${DHCP_SERVER} -b ${INTERFACE_ETH}
 
 
 # Capture external docker signals
@@ -90,6 +80,4 @@ echo "Starting HostAP daemon ..."
 /usr/sbin/hostapd /etc/hostapd.conf &
 
 wait $!
-
-
 
